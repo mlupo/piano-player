@@ -7,45 +7,18 @@ import sys
 import time
 import midi
 import midi.sequencer as sequencer
-
 # Import the PCA9685 module.
 import Adafruit_PCA9685
 
-# Uncomment to enable debug output.
-#import logging
-#logging.basicConfig(level=logging.DEBUG)
+#if len(sys.argv) != 3:
+#    print("Usage: {0} <client> <port>".format(sys.argv[0]))
+#    exit(2)
 
-# Initialise the PCA9685 using the default address (0x40).
-pwm = Adafruit_PCA9685.PCA9685()
+#client = sys.argv[1]
+#port   = sys.argv[2]
 
-# Alternatively specify a different address and/or bus:
-#pwm = Adafruit_PCA9685.PCA9685(address=0x41, busnum=2)
-
-# Configure min and max servo pulse lengths
-servo_min = 155  # Min pulse length out of 4096
-
-servo_max = 600  # Max pulse length out of 4096
-servo_press = 278
-
-# Set frequency to 60hz, good for servos.
-pwm.set_pwm_freq(60)
-
-def set_servo_pulse(channel, pulse):
-    pulse_length = 1000000    # 1,000,000 us per second
-    pulse_length //= 60       # 60 Hz
-    print('{0}us per period'.format(pulse_length))
-    pulse_length //= 4096     # 12 bits of resolution
-    print('{0}us per bit'.format(pulse_length))
-    pulse *= 1000
-    pulse //= pulse_length
-    pwm.set_pwm(channel, 0, pulse)
-
-if len(sys.argv) != 3:
-    print("Usage: {0} <client> <port>".format(sys.argv[0]))
-    exit(2)
-
-client = sys.argv[1]
-port   = sys.argv[2]
+client = 20
+port = 0
 
 hardware = sequencer.SequencerHardware()
 
@@ -59,6 +32,24 @@ seq = sequencer.SequencerRead(sequencer_resolution=120)
 seq.subscribe_port(client, port)
 
 seq.start_sequencer()
+
+# Initialise the PCA9685 using the default address (0x40).
+pwm = Adafruit_PCA9685.PCA9685()
+
+# Alternatively specify a different address and/or bus:
+#pwm = Adafruit_PCA9685.PCA9685(address=0x41, busnum=2)
+
+# Set frequency to 60hz, good for servos.
+pwm.set_pwm_freq(60)
+
+# Configure min and max servo pulse lengths
+servo_min = 155  # Min pulse length out of 4096
+
+servo_max = 600  # Max pulse length out of 4096
+servo_press = 278
+
+ON = servo_max
+OFF = servo_min
 
 C5 = 72
 D5 = 74
@@ -78,10 +69,17 @@ B6 = 95
 NOTE_DICT = {C5:0, D5:1, E5:2, F5:3, G5:4, A5:5, B5:6,
              C6:7, D6:8, E6:9, F6:10, G6:11, A6:12, B6:13}
 
-ON = 1
-OFF = 0
+def set_servo_pulse(channel, pulse):
+    pulse_length = 1000000    # 1,000,000 us per second
+    pulse_length //= 60       # 60 Hz
+    print('{0}us per period'.format(pulse_length))
+    pulse_length //= 4096     # 12 bits of resolution
+    print('{0}us per bit'.format(pulse_length))
+    pulse *= 1000
+    pulse //= pulse_length
+    pwm.set_pwm(channel, 0, pulse)
 
-def noteCheck(data, signal):
+def noteCheck(data, signal, channel=0):
     """take the data attributes of the midi event, and assign it
     to the appropiate values to work with the servos. If the data is not
     in the dictionary of notes, pass it along"""
@@ -91,10 +89,11 @@ def noteCheck(data, signal):
             signal = OFF
         elif signal != 0:
             signal = ON
+        pwm.set_pwm(data, channel, signal)
     else:
         note_key = data
         signal = signal
-    return data, signal
+        return data, signal
 
 
 def notePlay(midi_event):
@@ -103,7 +102,7 @@ def notePlay(midi_event):
 
 while True:
     event = seq.event_read()
-    notePlay(event)
+    noteCheck(event)
 
 
 
